@@ -20,21 +20,6 @@ import { MotiView } from 'moti';
 import GradientBackground from '@/components/GradientBackground';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 
-if (Platform.OS === 'web' && typeof document !== 'undefined') {
-  const iconFont = require('@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf');
-  const style = document.createElement('style');
-  style.type = 'text/css';
-  style.appendChild(
-    document.createTextNode(`
-      @font-face {
-        font-family: 'Ionicons';
-        src: url(${iconFont}) format('truetype');
-      }
-    `)
-  );
-  document.head.appendChild(style);
-}
-
 SplashScreen.preventAutoHideAsync();
 
 // Force dark mode handled in components

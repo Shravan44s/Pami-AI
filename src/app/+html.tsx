@@ -19,8 +19,13 @@ export default function Root({ children }: PropsWithChildren) {
 
         {/* 
           Disable pull-to-refresh on mobile web for a native feel 
+          and load Ionicons from public directory for reliable static rendering
         */}
         <style dangerouslySetInnerHTML={{ __html: `
+          @font-face {
+            font-family: 'Ionicons';
+            src: url('/fonts/Ionicons.ttf') format('truetype');
+          }
           body {
             overscroll-behavior-y: none;
             background-color: #080912;
