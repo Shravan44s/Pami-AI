@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { Tabs } from 'expo-router';
+import { useFonts } from 'expo-font';
 import {
   useColorScheme,
   View,
@@ -121,9 +122,19 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
 
 // ─── Root Layout ──────────────────────────────────────────────────────────────
 export default function TabLayout() {
+  const [loaded] = useFonts({
+    ...Ionicons.font,
+  });
+
   useEffect(() => {
-    SplashScreen.hideAsync();
-  }, []);
+    if (loaded) {
+      SplashScreen.hideAsync();
+    }
+  }, [loaded]);
+
+  if (!loaded) {
+    return null;
+  }
 
   return (
     <ThemeProvider value={DarkTheme}>

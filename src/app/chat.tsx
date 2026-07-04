@@ -118,7 +118,7 @@ export default function ChatScreen() {
       const res = await apiRequest('chat', 'POST', { message: text });
       const aiMsg: Message = {
         id: Math.random().toString(),
-        text: res?.reply || res?.message || 'No response.',
+        text: typeof res === 'string' ? res : (res?.reply || res?.message || 'No response.'),
         sender: 'ai',
         timestamp: new Date(),
       };

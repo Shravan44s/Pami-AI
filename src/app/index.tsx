@@ -8,11 +8,11 @@ import {
   RefreshControl,
   useColorScheme,
   Platform,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Image } from 'expo-image';
 import { MotiView, MotiText } from 'moti';
 import { apiRequest } from '@/api/client';
 import { Colors, Gradients, StatusColors } from '@/constants/theme';

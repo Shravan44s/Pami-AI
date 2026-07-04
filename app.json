@@ -8,7 +8,8 @@
     "scheme": "pamiai",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/images/PamiAI-logo.png"
+      "icon": "./assets/images/PamiAI-logo.png",
+      "bundleIdentifier": "com.anonymous.PamiAI"
     },
     "android": {
       "adaptiveIcon": {
