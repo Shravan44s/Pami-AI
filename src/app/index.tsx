@@ -4,14 +4,12 @@ import {
   Text,
   View,
   ScrollView,
-  ActivityIndicator,
   RefreshControl,
   useColorScheme,
   Platform,
-  Image,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView, MotiText } from 'moti';
 import { apiRequest } from '@/api/client';
@@ -21,6 +19,8 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import GlassCard from '@/components/GlassCard';
 import GlowButton from '@/components/GlowButton';
 import AnimatedStatCard from '@/components/AnimatedStatCard';
+import { SkeletonBlock, SkeletonRow } from '@/components/Skeleton';
+import * as Haptics from 'expo-haptics';
 
 interface DashboardData {
   tasksCount: { todo: number; inProgress: number; done: number; failed: number };
@@ -61,8 +61,10 @@ export default function DashboardScreen() {
 
   const handleRunOrchestrator = async () => {
     setOrchestratorRunning(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await apiRequest('runOrchestrator', 'POST');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       fetchDashboardData(true);
     } catch (err: any) {
       alert(`Execution failed: ${err.message}`);
@@ -73,16 +75,16 @@ export default function DashboardScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <MotiView
-          from={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ type: 'spring' }}
-          style={styles.loadingInner}
-        >
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading Pami AI…</Text>
-        </MotiView>
+      <View style={[styles.container, { paddingTop: insets.top + 24, paddingHorizontal: 18 }]}>
+        <View style={styles.statsGrid}>
+          {[1, 2, 3, 4].map((i) => (
+            <SkeletonBlock key={i} width="48%" height={84} borderRadius={18} />
+          ))}
+        </View>
+        <SkeletonBlock height={100} borderRadius={20} style={{ marginBottom: 28 }} />
+        <View style={{ gap: 10 }}>
+          {[1, 2, 3].map((i) => <SkeletonRow key={i} />)}
+        </View>
       </View>
     );
   }
@@ -256,9 +258,6 @@ export default function DashboardScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingInner: { alignItems: 'center', gap: 12 },
-  loadingText: { fontSize: 14, fontWeight: '500' },
   scroll: { paddingHorizontal: 18, paddingTop: 12 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
   greeting: { fontSize: 13, fontWeight: '500', marginBottom: 2 },

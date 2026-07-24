@@ -6,23 +6,29 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
-  ActivityIndicator,
-  SafeAreaView,
-  useColorScheme,
   Switch,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { MotiView } from 'moti';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { apiRequest } from '@/api/client';
 import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
+import GlassCard from '@/components/GlassCard';
+import GlowButton from '@/components/GlowButton';
+import ScreenHeader from '@/components/ScreenHeader';
 
 type FormType = 'task' | 'repo' | 'issue' | 'aiart';
 
+const FORM_TABS: { key: FormType; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { key: 'task', label: 'Task', icon: 'document-text' },
+  { key: 'repo', label: 'Repo', icon: 'git-branch' },
+  { key: 'issue', label: 'Issue', icon: 'bug' },
+  { key: 'aiart', label: 'AI Art', icon: 'color-palette' },
+];
+
 export default function CreateScreen() {
-  const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
-  const isDark = true;
   const colors = Colors.dark;
 
   const [activeForm, setActiveForm] = useState<FormType>('task');
@@ -47,7 +53,6 @@ export default function CreateScreen() {
 
   // Form states - AI Art
   const [artPrompt, setArtPrompt] = useState('');
-  const [generatedArtUrl, setGeneratedArtUrl] = useState<string | null>(null);
 
   const resetForms = () => {
     setTaskName('');
@@ -59,7 +64,6 @@ export default function CreateScreen() {
     setIssueTitle('');
     setIssueBody('');
     setArtPrompt('');
-    setGeneratedArtUrl(null);
   };
 
   const handleCreateTask = async () => {
@@ -72,6 +76,7 @@ export default function CreateScreen() {
         priority: taskPriority,
         details: taskDetails,
       });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       alert('📝 Notion task created successfully!');
       resetForms();
     } catch (err: any) {
@@ -90,6 +95,7 @@ export default function CreateScreen() {
         description: repoDesc,
         isPrivate: repoPrivate,
       });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       alert(`🐙 GitHub Repository created!\nUrl: ${res.url}`);
       resetForms();
     } catch (err: any) {
@@ -109,6 +115,7 @@ export default function CreateScreen() {
         title: issueTitle,
         body: issueBody,
       });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       alert(`🐙 GitHub Issue #${res.number} created!`);
       resetForms();
     } catch (err: any) {
@@ -121,16 +128,15 @@ export default function CreateScreen() {
   const handleGenerateArt = async () => {
     if (!artPrompt.trim()) return;
     setLoading(true);
-    setGeneratedArtUrl(null);
     try {
-      // Re-use confirm/aiart logic. Let's make an API call to a prompt enhancer on the backend
-      const res = await apiRequest('createTask', 'POST', {
+      await apiRequest('createTask', 'POST', {
         name: artPrompt,
         platform: 'Instagram',
         priority: 'Medium',
-        details: artPrompt, // Details will prompt image generation on run or directly
+        details: artPrompt, // Details will prompt image generation, converted to a Reel on confirm
       });
-      alert(`🎨 Notion Instagram task created for AI Art!\nTask Title: "${artPrompt}"`);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      alert(`🎨 Notion Instagram task created for AI Art!\nTask Title: "${artPrompt}"\n\nIt'll be rendered as a video Reel when you confirm it on the Tasks tab.`);
       resetForms();
     } catch (err: any) {
       alert(`Art task creation failed: ${err.message}`);
@@ -140,282 +146,285 @@ export default function CreateScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + 16 }]}>
+    <View style={styles.container}>
+      <ScreenHeader title="Create" subtitle="New Automation" />
 
-      {/* Category selector grid */}
+      {/* ── Form Type Selector ── */}
       <View style={styles.gridNav}>
-        {(['task', 'repo', 'issue', 'aiart'] as const).map(form => (
-          <TouchableOpacity
-            key={form}
-            style={[
-              styles.navBtn,
-              { backgroundColor: colors.card, borderColor: colors.border },
-              activeForm === form && { borderColor: colors.primary, backgroundColor: colors.primary + '10' }
-            ]}
-            onPress={() => {
-              setActiveForm(form);
-              resetForms();
-            }}
-          >
-            <Ionicons
-              name={
-                form === 'task' ? 'document-text' :
-                form === 'repo' ? 'git-branch' :
-                form === 'issue' ? 'bug' : 'color-palette'
-              }
-              size={20}
-              color={activeForm === form ? colors.primary : colors.textSecondary}
-            />
-            <Text
-              style={[
-                styles.navBtnText,
-                { color: activeForm === form ? colors.primary : colors.textSecondary }
-              ]}
+        {FORM_TABS.map((form) => {
+          const active = activeForm === form.key;
+          return (
+            <TouchableOpacity
+              key={form.key}
+              activeOpacity={0.8}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setActiveForm(form.key);
+                resetForms();
+              }}
+              style={{ flex: 1 }}
             >
-              {
-                form === 'task' ? 'Task' :
-                form === 'repo' ? 'Repo' :
-                form === 'issue' ? 'Issue' : 'AI Art'
-              }
-            </Text>
-          </TouchableOpacity>
-        ))}
+              <MotiView
+                animate={{ scale: active ? 1.04 : 1 }}
+                transition={{ type: 'spring', damping: 18, stiffness: 300 }}
+              >
+                {active ? (
+                  <LinearGradient
+                    colors={['#6366f1', '#a855f7']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.navBtn}
+                  >
+                    <Ionicons name={form.icon} size={20} color="#fff" />
+                    <Text style={[styles.navBtnText, { color: '#fff' }]}>{form.label}</Text>
+                  </LinearGradient>
+                ) : (
+                  <View style={[styles.navBtn, { backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)' }]}>
+                    <Ionicons name={form.icon} size={20} color={colors.textSecondary} />
+                    <Text style={[styles.navBtnText, { color: colors.textSecondary }]}>{form.label}</Text>
+                  </View>
+                )}
+              </MotiView>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Notion Task Form */}
         {activeForm === 'task' && (
-          <View style={styles.formContainer}>
-            <Text style={[styles.formTitle, { color: colors.text }]}>Add Notion Task</Text>
+          <MotiView key="task" from={{ opacity: 0, translateY: 16 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'spring', damping: 22 }}>
+            <GlassCard borderRadius={20} padding={18} style={{ gap: 4 }} glowColor="rgba(99,102,241,0.25)">
+              <Text style={[styles.formTitle, { color: colors.text }]}>Add Notion Task</Text>
 
-            <Text style={[styles.label, { color: colors.textSecondary }]}>Task Name *</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
-              placeholder="Clean my workspace / Optimize builds..."
-              placeholderTextColor={colors.textSecondary}
-              value={taskName}
-              onChangeText={setTaskName}
-            />
+              <Text style={[styles.label, { color: colors.textSecondary }]}>Task Name *</Text>
+              <TextInput
+                style={[styles.input, { backgroundColor: 'rgba(255,255,255,0.04)', borderColor: colors.border, color: colors.text }]}
+                placeholder="Clean my workspace / Optimize builds..."
+                placeholderTextColor={colors.textSecondary}
+                value={taskName}
+                onChangeText={setTaskName}
+              />
 
-            <Text style={[styles.label, { color: colors.textSecondary }]}>Platform</Text>
-            <View style={styles.pickerRow}>
-              {(['General', 'GitHub', 'Instagram', 'VSCode'] as const).map(platform => (
-                <TouchableOpacity
-                  key={platform}
-                  style={[
-                    styles.pickerBtn,
-                    { backgroundColor: colors.card, borderColor: colors.border },
-                    taskPlatform === platform && { backgroundColor: colors.primary, borderColor: colors.primary }
-                  ]}
-                  onPress={() => setTaskPlatform(platform)}
-                >
-                  <Text style={[styles.pickerBtnText, { color: taskPlatform === platform ? '#fff' : colors.text }]}>
-                    {platform}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>Platform</Text>
+              <View style={styles.pickerRow}>
+                {(['General', 'GitHub', 'Instagram', 'VSCode'] as const).map(platform => (
+                  <TouchableOpacity
+                    key={platform}
+                    style={[
+                      styles.pickerBtn,
+                      { backgroundColor: 'rgba(255,255,255,0.04)', borderColor: colors.border },
+                      taskPlatform === platform && { backgroundColor: colors.primary, borderColor: colors.primary }
+                    ]}
+                    onPress={() => setTaskPlatform(platform)}
+                  >
+                    <Text style={[styles.pickerBtnText, { color: taskPlatform === platform ? '#fff' : colors.text }]}>
+                      {platform}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
 
-            <Text style={[styles.label, { color: colors.textSecondary }]}>Priority</Text>
-            <View style={styles.pickerRow}>
-              {(['Low', 'Medium', 'High'] as const).map(priority => (
-                <TouchableOpacity
-                  key={priority}
-                  style={[
-                    styles.pickerBtn,
-                    { backgroundColor: colors.card, borderColor: colors.border },
-                    taskPriority === priority && {
-                      backgroundColor:
-                        priority === 'High' ? colors.error :
-                        priority === 'Medium' ? colors.warning : colors.success,
-                      borderColor: 'transparent'
-                    }
-                  ]}
-                  onPress={() => setTaskPriority(priority)}
-                >
-                  <Text style={[styles.pickerBtnText, { color: taskPriority === priority ? '#fff' : colors.text }]}>
-                    {priority}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>Priority</Text>
+              <View style={styles.pickerRow}>
+                {(['Low', 'Medium', 'High'] as const).map(priority => (
+                  <TouchableOpacity
+                    key={priority}
+                    style={[
+                      styles.pickerBtn,
+                      { backgroundColor: 'rgba(255,255,255,0.04)', borderColor: colors.border },
+                      taskPriority === priority && {
+                        backgroundColor:
+                          priority === 'High' ? colors.error :
+                          priority === 'Medium' ? colors.warning : colors.success,
+                        borderColor: 'transparent'
+                      }
+                    ]}
+                    onPress={() => setTaskPriority(priority)}
+                  >
+                    <Text style={[styles.pickerBtnText, { color: taskPriority === priority ? '#fff' : colors.text }]}>
+                      {priority}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
 
-            <Text style={[styles.label, { color: colors.textSecondary }]}>Details (Optional)</Text>
-            <TextInput
-              style={[styles.input, styles.textArea, {
-                backgroundColor: colors.card,
-                borderColor: colors.border,
-                color: colors.text
-              }]}
-              multiline
-              numberOfLines={4}
-              placeholder="Provide extra details, video prompts, or markdown configs here..."
-              placeholderTextColor={colors.textSecondary}
-              value={taskDetails}
-              onChangeText={setTaskDetails}
-            />
+              <Text style={[styles.label, { color: colors.textSecondary }]}>Details (Optional)</Text>
+              <TextInput
+                style={[styles.input, styles.textArea, {
+                  backgroundColor: 'rgba(255,255,255,0.04)',
+                  borderColor: colors.border,
+                  color: colors.text
+                }]}
+                multiline
+                numberOfLines={4}
+                placeholder="Provide extra details, video prompts, or markdown configs here..."
+                placeholderTextColor={colors.textSecondary}
+                value={taskDetails}
+                onChangeText={setTaskDetails}
+              />
 
-            <TouchableOpacity
-              style={[styles.submitBtn, { backgroundColor: colors.primary }]}
-              onPress={handleCreateTask}
-              disabled={loading || !taskName.trim()}
-            >
-              {loading ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={styles.submitBtnText}>Create Task</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+              <GlowButton
+                label="Create Task"
+                onPress={handleCreateTask}
+                loading={loading}
+                disabled={!taskName.trim()}
+                icon={<Ionicons name="add-circle-outline" size={16} color="#fff" />}
+                style={{ marginTop: 10 }}
+              />
+            </GlassCard>
+          </MotiView>
         )}
 
         {/* GitHub Repo Form */}
         {activeForm === 'repo' && (
-          <View style={styles.formContainer}>
-            <Text style={[styles.formTitle, { color: colors.text }]}>New GitHub Repository</Text>
+          <MotiView key="repo" from={{ opacity: 0, translateY: 16 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'spring', damping: 22 }}>
+            <GlassCard borderRadius={20} padding={18} style={{ gap: 4 }} glowColor="rgba(99,102,241,0.25)">
+              <Text style={[styles.formTitle, { color: colors.text }]}>New GitHub Repository</Text>
 
-            <Text style={[styles.label, { color: colors.textSecondary }]}>Repo Name *</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
-              placeholder="my-new-automation-system"
-              placeholderTextColor={colors.textSecondary}
-              value={repoName}
-              onChangeText={setRepoName}
-            />
-
-            <Text style={[styles.label, { color: colors.textSecondary }]}>Description</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
-              placeholder="Repository to automate workflow schedules..."
-              placeholderTextColor={colors.textSecondary}
-              value={repoDesc}
-              onChangeText={setRepoDesc}
-            />
-
-            <View style={styles.switchRow}>
-              <View>
-                <Text style={[styles.switchLabel, { color: colors.text }]}>Private Repository</Text>
-                <Text style={[styles.switchSub, { color: colors.textSecondary }]}>Restrict repository access</Text>
-              </View>
-              <Switch
-                value={repoPrivate}
-                onValueChange={setRepoPrivate}
-                trackColor={{ false: '#767577', true: colors.primary }}
+              <Text style={[styles.label, { color: colors.textSecondary }]}>Repo Name *</Text>
+              <TextInput
+                style={[styles.input, { backgroundColor: 'rgba(255,255,255,0.04)', borderColor: colors.border, color: colors.text }]}
+                placeholder="my-new-automation-system"
+                placeholderTextColor={colors.textSecondary}
+                value={repoName}
+                onChangeText={setRepoName}
+                autoCapitalize="none"
               />
-            </View>
 
-            <TouchableOpacity
-              style={[styles.submitBtn, { backgroundColor: colors.primary }]}
-              onPress={handleCreateRepo}
-              disabled={loading || !repoName.trim()}
-            >
-              {loading ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={styles.submitBtnText}>Create Repository</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>Description</Text>
+              <TextInput
+                style={[styles.input, { backgroundColor: 'rgba(255,255,255,0.04)', borderColor: colors.border, color: colors.text }]}
+                placeholder="Repository to automate workflow schedules..."
+                placeholderTextColor={colors.textSecondary}
+                value={repoDesc}
+                onChangeText={setRepoDesc}
+              />
+
+              <View style={styles.switchRow}>
+                <View>
+                  <Text style={[styles.switchLabel, { color: colors.text }]}>Private Repository</Text>
+                  <Text style={[styles.switchSub, { color: colors.textSecondary }]}>Restrict repository access</Text>
+                </View>
+                <Switch
+                  value={repoPrivate}
+                  onValueChange={setRepoPrivate}
+                  trackColor={{ false: '#767577', true: colors.primary }}
+                />
+              </View>
+
+              <GlowButton
+                label="Create Repository"
+                onPress={handleCreateRepo}
+                loading={loading}
+                disabled={!repoName.trim()}
+                icon={<Ionicons name="git-branch-outline" size={16} color="#fff" />}
+              />
+            </GlassCard>
+          </MotiView>
         )}
 
         {/* GitHub Issue Form */}
         {activeForm === 'issue' && (
-          <View style={styles.formContainer}>
-            <Text style={[styles.formTitle, { color: colors.text }]}>New GitHub Issue</Text>
+          <MotiView key="issue" from={{ opacity: 0, translateY: 16 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'spring', damping: 22 }}>
+            <GlassCard borderRadius={20} padding={18} style={{ gap: 4 }} glowColor="rgba(99,102,241,0.25)">
+              <Text style={[styles.formTitle, { color: colors.text }]}>New GitHub Issue</Text>
 
-            <View style={styles.splitRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>Owner *</Text>
-                <TextInput
-                  style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
-                  placeholder="Shravan44s"
-                  placeholderTextColor={colors.textSecondary}
-                  value={issueOwner}
-                  onChangeText={setIssueOwner}
-                />
+              <View style={styles.splitRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>Owner *</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: 'rgba(255,255,255,0.04)', borderColor: colors.border, color: colors.text }]}
+                    placeholder="Shravan44s"
+                    placeholderTextColor={colors.textSecondary}
+                    value={issueOwner}
+                    onChangeText={setIssueOwner}
+                    autoCapitalize="none"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>Repo Name *</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: 'rgba(255,255,255,0.04)', borderColor: colors.border, color: colors.text }]}
+                    placeholder="MCP"
+                    placeholderTextColor={colors.textSecondary}
+                    value={issueRepo}
+                    onChangeText={setIssueRepo}
+                    autoCapitalize="none"
+                  />
+                </View>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>Repo Name *</Text>
-                <TextInput
-                  style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
-                  placeholder="MCP"
-                  placeholderTextColor={colors.textSecondary}
-                  value={issueRepo}
-                  onChangeText={setIssueRepo}
-                />
-              </View>
-            </View>
 
-            <Text style={[styles.label, { color: colors.textSecondary }]}>Issue Title *</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
-              placeholder="Fix SQLite token metrics reporting error..."
-              placeholderTextColor={colors.textSecondary}
-              value={issueTitle}
-              onChangeText={setIssueTitle}
-            />
+              <Text style={[styles.label, { color: colors.textSecondary }]}>Issue Title *</Text>
+              <TextInput
+                style={[styles.input, { backgroundColor: 'rgba(255,255,255,0.04)', borderColor: colors.border, color: colors.text }]}
+                placeholder="Fix SQLite token metrics reporting error..."
+                placeholderTextColor={colors.textSecondary}
+                value={issueTitle}
+                onChangeText={setIssueTitle}
+              />
 
-            <Text style={[styles.label, { color: colors.textSecondary }]}>Description / Details</Text>
-            <TextInput
-              style={[styles.input, styles.textArea, {
-                backgroundColor: colors.card,
-                borderColor: colors.border,
-                color: colors.text
-              }]}
-              multiline
-              numberOfLines={4}
-              placeholder="Steps to reproduce, error logs, or requirements..."
-              placeholderTextColor={colors.textSecondary}
-              value={issueBody}
-              onChangeText={setIssueBody}
-            />
+              <Text style={[styles.label, { color: colors.textSecondary }]}>Description / Details</Text>
+              <TextInput
+                style={[styles.input, styles.textArea, {
+                  backgroundColor: 'rgba(255,255,255,0.04)',
+                  borderColor: colors.border,
+                  color: colors.text
+                }]}
+                multiline
+                numberOfLines={4}
+                placeholder="Steps to reproduce, error logs, or requirements..."
+                placeholderTextColor={colors.textSecondary}
+                value={issueBody}
+                onChangeText={setIssueBody}
+              />
 
-            <TouchableOpacity
-              style={[styles.submitBtn, { backgroundColor: colors.primary }]}
-              onPress={handleCreateIssue}
-              disabled={loading || !issueOwner.trim() || !issueRepo.trim() || !issueTitle.trim()}
-            >
-              {loading ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={styles.submitBtnText}>Create Issue</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+              <GlowButton
+                label="Create Issue"
+                onPress={handleCreateIssue}
+                loading={loading}
+                disabled={!issueOwner.trim() || !issueRepo.trim() || !issueTitle.trim()}
+                icon={<Ionicons name="bug-outline" size={16} color="#fff" />}
+                style={{ marginTop: 10 }}
+              />
+            </GlassCard>
+          </MotiView>
         )}
 
         {/* AI Art Form */}
         {activeForm === 'aiart' && (
-          <View style={styles.formContainer}>
-            <Text style={[styles.formTitle, { color: colors.text }]}>Generate AI Art Post</Text>
-            <Text style={[styles.label, { color: colors.textSecondary }]}>Prompt Description *</Text>
-            <TextInput
-              style={[styles.input, styles.textArea, {
-                backgroundColor: colors.card,
-                borderColor: colors.border,
-                color: colors.text
-              }]}
-              multiline
-              numberOfLines={3}
-              placeholder="A beautiful futuristic neon cyberpunk city with flying cars, highly detailed, photorealistic 8k..."
-              placeholderTextColor={colors.textSecondary}
-              value={artPrompt}
-              onChangeText={setArtPrompt}
-            />
+          <MotiView key="aiart" from={{ opacity: 0, translateY: 16 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'spring', damping: 22 }}>
+            <GlassCard borderRadius={20} padding={18} style={{ gap: 4 }} glowColor="rgba(168,85,247,0.28)">
+              <Text style={[styles.formTitle, { color: colors.text }]}>Generate AI Art Post</Text>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>Prompt Description *</Text>
+              <TextInput
+                style={[styles.input, styles.textArea, {
+                  backgroundColor: 'rgba(255,255,255,0.04)',
+                  borderColor: colors.border,
+                  color: colors.text
+                }]}
+                multiline
+                numberOfLines={3}
+                placeholder="A beautiful futuristic neon cyberpunk city with flying cars, highly detailed, photorealistic 8k..."
+                placeholderTextColor={colors.textSecondary}
+                value={artPrompt}
+                onChangeText={setArtPrompt}
+              />
 
-            <TouchableOpacity
-              style={[styles.submitBtn, { backgroundColor: colors.secondary }]}
-              onPress={handleGenerateArt}
-              disabled={loading || !artPrompt.trim()}
-            >
-              {loading ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={styles.submitBtnText}>Generate Art Task</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+              <GlowButton
+                label="Generate Art Task"
+                onPress={handleGenerateArt}
+                loading={loading}
+                disabled={!artPrompt.trim()}
+                colors={['#7c3aed', '#a855f7', '#d946ef']}
+                icon={<Ionicons name="sparkles" size={16} color="#fff" />}
+                style={{ marginTop: 10 }}
+              />
+            </GlassCard>
+          </MotiView>
         )}
+
+        <View style={{ height: 110 }} />
       </ScrollView>
     </View>
   );
@@ -427,97 +436,76 @@ const styles = StyleSheet.create({
   },
   gridNav: {
     flexDirection: 'row',
-    padding: 12,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
     gap: 8,
   },
   navBtn: {
-    flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 12,
     alignItems: 'center',
-    borderRadius: 8,
-    borderWidth: 1,
+    borderRadius: 14,
     gap: 4,
   },
   navBtnText: {
     fontSize: 11,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
   scrollContent: {
-    padding: 16,
-  },
-  formContainer: {
-    gap: 6,
+    paddingHorizontal: 16,
   },
   formTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 16,
+    fontSize: 17,
+    fontWeight: '800',
+    marginBottom: 14,
+    letterSpacing: -0.3,
   },
   label: {
     fontSize: 12,
-    fontWeight: 'bold',
-    marginTop: 8,
-    marginBottom: 4,
+    fontWeight: '700',
+    marginTop: 10,
+    marginBottom: 6,
   },
   input: {
-    height: 48,
-    borderRadius: 8,
+    height: 46,
+    borderRadius: 12,
     borderWidth: 1,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     fontSize: 14,
-    marginBottom: 8,
   },
   textArea: {
     height: 100,
     textAlignVertical: 'top',
-    paddingTop: 10,
+    paddingTop: 12,
   },
   pickerRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 10,
   },
   pickerBtn: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
+    paddingVertical: 9,
+    borderRadius: 10,
     borderWidth: 1,
   },
   pickerBtnText: {
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
   switchRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 12,
-    marginBottom: 12,
   },
   switchLabel: {
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
   switchSub: {
     fontSize: 11,
     marginTop: 2,
-  },
-  submitBtn: {
-    height: 48,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 3,
-  },
-  submitBtnText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: 'bold',
   },
   splitRow: {
     flexDirection: 'row',

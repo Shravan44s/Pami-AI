@@ -149,7 +149,6 @@ export default function TabLayout() {
           <Tabs.Screen name="create" />
           <Tabs.Screen name="chat" />
           <Tabs.Screen name="settings" />
-          <Tabs.Screen name="explore" options={{ href: null }} />
         </Tabs>
       </GradientBackground>
     </ThemeProvider>

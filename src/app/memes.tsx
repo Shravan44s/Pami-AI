@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -7,22 +7,23 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  useColorScheme,
+  RefreshControl,
   Clipboard,
   Modal,
   Dimensions,
   Platform,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { MotiView } from 'moti';
+import * as Haptics from 'expo-haptics';
 import { apiRequest } from '@/api/client';
 import { Colors } from '@/constants/theme';
 import GlassCard from '@/components/GlassCard';
 import GlowButton from '@/components/GlowButton';
+import ScreenHeader from '@/components/ScreenHeader';
 import { Ionicons } from '@expo/vector-icons';
 
 interface SearchMemeResult {
@@ -32,6 +33,7 @@ interface SearchMemeResult {
   source: string;
   taskId: string;
   shortId: string;
+  alreadyPosted?: boolean;
 }
 
 const PRESETS = [
@@ -46,14 +48,13 @@ const PRESETS = [
 const { width } = Dimensions.get('window');
 
 export default function MemesScreen() {
-  const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
-  const isDark = true;
   const colors = Colors.dark;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [loadingSearch, setLoadingSearch] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchMemeResult[]>([]);
+  const [isBrowsingFeed, setIsBrowsingFeed] = useState(true);
   const [confirmingTaskId, setConfirmingTaskId] = useState<string | null>(null);
 
   // Lightbox Modal states
@@ -68,12 +69,39 @@ export default function MemesScreen() {
     taskId: string;
   } | null>(null);
 
-  const handleSearch = async (queryOverride?: string) => {
+  // Dynamic trending feed — shows fresh, varied memes as soon as the screen
+  // opens, instead of an empty state waiting on a search. The initial mount
+  // load stays quiet on failure (no blocking alert) — an empty state is
+  // enough; refreshes the user explicitly triggers still surface errors.
+  const fetchTrendingFeed = async (options: { silentSpinner?: boolean; silentError?: boolean } = {}) => {
+    if (!options.silentSpinner) setLoadingSearch(true);
+    setIsBrowsingFeed(true);
+    try {
+      const res = await apiRequest('trendingFeed', 'GET', null);
+      setSearchResults(res || []);
+    } catch (err: any) {
+      if (!options.silentError) alert(`Failed to load trending memes: ${err.message}`);
+    } finally {
+      setLoadingSearch(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => { fetchTrendingFeed({ silentError: true }); }, []);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    Haptics.selectionAsync();
+    if (isBrowsingFeed) fetchTrendingFeed({ silentSpinner: true });
+    else handleSearch(undefined, true);
+  };
+
+  const handleSearch = async (queryOverride?: string, silent = false) => {
     const q = queryOverride !== undefined ? queryOverride : searchQuery;
-    if (!q.trim()) return;
-    
-    setLoadingSearch(true);
-    setSearchResults([]);
+    if (!q.trim()) { fetchTrendingFeed(); return; }
+
+    if (!silent) { setLoadingSearch(true); setSearchResults([]); }
+    setIsBrowsingFeed(false);
     try {
       const res = await apiRequest(`searchMemes&q=${encodeURIComponent(q)}`, 'GET', null);
       setSearchResults(res || []);
@@ -81,12 +109,19 @@ export default function MemesScreen() {
       alert(`Search failed: ${err.message}`);
     } finally {
       setLoadingSearch(false);
+      setRefreshing(false);
     }
   };
 
   const handlePresetSelect = (q: string) => {
+    Haptics.selectionAsync();
     setSearchQuery(q);
     handleSearch(q);
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    fetchTrendingFeed();
   };
 
   const handleGenerateAIMeme = async () => {
@@ -107,7 +142,8 @@ export default function MemesScreen() {
     setConfirmingTaskId(taskId);
     try {
       await apiRequest('confirmPost', 'POST', { taskId });
-      alert('🚀 Meme published to Instagram successfully!');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      alert('🚀 Reel published to Instagram successfully!');
       setSearchResults(prev => prev.filter(item => item.taskId !== taskId));
       if (aiMemeResult?.taskId === taskId) {
         setAiMemeResult(null);
@@ -121,13 +157,19 @@ export default function MemesScreen() {
 
   const copyToClipboard = (text: string) => {
     Clipboard.setString(text);
+    Haptics.selectionAsync();
     alert('📋 Caption copied to clipboard!');
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
+    <View style={styles.container}>
+      <ScreenHeader title="Memes" subtitle="Trending Now" />
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+      >
 
         {/* Input Bar */}
         <View style={styles.searchBarContainer}>
@@ -140,12 +182,13 @@ export default function MemesScreen() {
             placeholder="Search topic (e.g. marriage, coding, cats)..."
             placeholderTextColor={colors.textSecondary}
             value={searchQuery}
-            onChangeText={setSearchQuery}
+            onChangeText={(t) => { setSearchQuery(t); if (!t.trim()) clearSearch(); }}
             onSubmitEditing={() => handleSearch()}
+            returnKeyType="search"
           />
           <TouchableOpacity
             style={[styles.searchBtn, { backgroundColor: colors.primary }]}
-            onPress={() => handleSearch()}
+            onPress={() => { Haptics.selectionAsync(); handleSearch(); }}
             disabled={loadingSearch}
           >
             {loadingSearch ? (
@@ -218,11 +261,11 @@ export default function MemesScreen() {
           </View>
         )}
 
-        {/* Search Results Feed */}
+        {/* Search Results / Trending Feed */}
         {searchResults.length > 0 && !loadingSearch && (
           <View style={styles.resultsContainer}>
             <Text style={[styles.resultsTitle, { color: colors.textSecondary }]}>
-              Found {searchResults.length} memes
+              {isBrowsingFeed ? `Trending across ${new Set(searchResults.map(m => m.source)).size} categories` : `Found ${searchResults.length} memes`}
             </Text>
             {searchResults.map((meme, i) => (
               <MotiView
@@ -232,16 +275,22 @@ export default function MemesScreen() {
                 transition={{ type: 'spring', damping: 24, delay: i * 80 }}
               >
                 <GlassCard borderRadius={20} padding={0} style={styles.memeCard} glowColor="rgba(99,102,241,0.25)">
-                  
+
                   {/* Header mimicking Reddit/IG poster details */}
                   <View style={[styles.cardHeader, { borderBottomColor: colors.border }]}>
                     <View style={styles.avatarPlaceholder}>
-                      <Text style={styles.avatarText}>{meme.source.substring(2, 4).toUpperCase()}</Text>
+                      <Text style={styles.avatarText}>{meme.source.substring(0, 2).toUpperCase()}</Text>
                     </View>
-                    <View>
+                    <View style={{ flex: 1 }}>
                       <Text style={[styles.authorText, { color: colors.text }]}>{meme.source}</Text>
                       <Text style={[styles.subredditSubText, { color: colors.textSecondary }]}>Trending now</Text>
                     </View>
+                    {meme.alreadyPosted && (
+                      <View style={styles.postedBadge}>
+                        <Ionicons name="checkmark-circle" size={11} color="#34d399" />
+                        <Text style={styles.postedBadgeText}>Posted recently</Text>
+                      </View>
+                    )}
                   </View>
 
                   {/* High-performance Cached Image */}
@@ -261,7 +310,7 @@ export default function MemesScreen() {
                   {/* Info and Actions Footer */}
                   <View style={styles.memeInfo}>
                     <Text style={[styles.memeTitle, { color: colors.text }]}>{meme.title}</Text>
-                    
+
                     <View style={styles.actionsRow}>
                       <View style={styles.voteContainer}>
                         <Ionicons name="heart" size={16} color="#ef4444" />
@@ -278,7 +327,7 @@ export default function MemesScreen() {
                     </View>
 
                     <GlowButton
-                      label={confirmingTaskId === meme.taskId ? '' : `Confirm to Post (${meme.shortId})`}
+                      label={confirmingTaskId === meme.taskId ? '' : `Post as Reel (${meme.shortId})`}
                       onPress={() => handleConfirmPost(meme.taskId)}
                       loading={confirmingTaskId === meme.taskId}
                       colors={['#f09433', '#dc2743', '#bc1888']}
@@ -347,7 +396,7 @@ export default function MemesScreen() {
               </View>
 
               <GlowButton
-                label={confirmingTaskId === aiMemeResult.taskId ? '' : 'Confirm to Post on Instagram'}
+                label={confirmingTaskId === aiMemeResult.taskId ? '' : 'Post as Reel on Instagram'}
                 onPress={() => handleConfirmPost(aiMemeResult.taskId)}
                 loading={confirmingTaskId === aiMemeResult.taskId}
                 colors={['#f09433', '#dc2743', '#bc1888']}
@@ -517,6 +566,20 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 11,
     fontWeight: 'bold',
+  },
+  postedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 20,
+    backgroundColor: 'rgba(52,211,153,0.12)',
+  },
+  postedBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#34d399',
   },
   authorText: {
     fontSize: 13,

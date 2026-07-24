@@ -7,17 +7,16 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  useColorScheme,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MotiView } from 'moti';
-import { LinearGradient } from 'expo-linear-gradient';
 import { getApiConfig, saveApiConfig, apiRequest } from '@/api/client';
-import { Colors, Gradients } from '@/constants/theme';
+import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import GlassCard from '@/components/GlassCard';
 import GlowButton from '@/components/GlowButton';
+import ScreenHeader from '@/components/ScreenHeader';
+import * as Haptics from 'expo-haptics';
 
 interface CreditsData {
   gemini: { used: number; requests: number };
@@ -25,10 +24,8 @@ interface CreditsData {
 }
 
 function SectionLabel({ children }: { children: string }) {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme !== 'light';
   return (
-    <Text style={[sectionStyle.label, { color: isDark ? 'rgba(248,250,252,0.45)' : 'rgba(15,23,42,0.45)' }]}>
+    <Text style={[sectionStyle.label, { color: 'rgba(248,250,252,0.45)' }]}>
       {children}
     </Text>
   );
@@ -38,9 +35,6 @@ const sectionStyle = StyleSheet.create({
 });
 
 export default function SettingsScreen() {
-  const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
-  const isDark = true;
   const colors = Colors.dark;
 
   const [apiUrl, setApiUrl] = useState('');
@@ -70,6 +64,7 @@ export default function SettingsScreen() {
     if (!apiUrl.trim() || !apiKey.trim()) { alert('Both API URL and API Key are required.'); return; }
     try {
       await saveApiConfig(apiUrl, apiKey);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
       fetchCredits();
@@ -80,39 +75,17 @@ export default function SettingsScreen() {
     setSendingEmail(true);
     try {
       await apiRequest('sendEmail', 'POST');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       alert('📧 Email report sent successfully!');
     } catch (err: any) { alert(`Failed: ${err.message}`); }
     finally { setSendingEmail(false); }
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
+    <View style={styles.container}>
+      <ScreenHeader title="Settings" subtitle="Command Center" />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-
-        {/* ── Profile/Status Hero ── */}
-        <MotiView
-          from={{ opacity: 0, translateY: -12 }}
-          animate={{ opacity: 1, translateY: 0 }}
-          transition={{ type: 'spring', damping: 20 }}
-        >
-          <GlassCard borderRadius={22} padding={0} glowColor="rgba(99,102,241,0.28)" style={{ overflow: 'hidden', marginBottom: 8 }}>
-            <LinearGradient
-              colors={['#6366f1', '#8b5cf6', '#a855f7']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.heroGradient}
-            >
-              <View style={styles.heroAvatar}>
-                <Ionicons name="sparkles" size={26} color="#fff" />
-              </View>
-              <View>
-                <Text style={styles.heroTitle}>Pami AI</Text>
-                <Text style={styles.heroSub}>Automation Command Center</Text>
-              </View>
-            </LinearGradient>
-          </GlassCard>
-        </MotiView>
 
         {/* ── API Configuration ── */}
         <SectionLabel>Connection</SectionLabel>
@@ -223,10 +196,6 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { paddingHorizontal: 16, paddingTop: 16 },
-  heroGradient: { flexDirection: 'row', alignItems: 'center', padding: 18, gap: 14 },
-  heroAvatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.20)', justifyContent: 'center', alignItems: 'center' },
-  heroTitle: { fontSize: 20, fontWeight: '800', color: '#fff', letterSpacing: -0.4 },
-  heroSub: { fontSize: 13, color: 'rgba(255,255,255,0.70)', marginTop: 2 },
   inputGroup: { gap: 6 },
   inputLabel: { fontSize: 12, fontWeight: '600' },
   inputWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: 'rgba(255,255,255,0.04)' },

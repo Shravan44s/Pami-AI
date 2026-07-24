@@ -9,10 +9,8 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  useColorScheme,
   Keyboard,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -21,6 +19,8 @@ import { apiRequest } from '@/api/client';
 import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import GlassCard from '@/components/GlassCard';
+import ScreenHeader from '@/components/ScreenHeader';
+import * as Haptics from 'expo-haptics';
 
 interface Message {
   id: string;
@@ -69,9 +69,6 @@ const tdStyles = StyleSheet.create({
 });
 
 export default function ChatScreen() {
-  const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
-  const isDark = true;
   const colors = Colors.dark;
 
   const [messages, setMessages] = useState<Message[]>([
@@ -102,6 +99,7 @@ export default function ChatScreen() {
 
   const handleSend = async () => {
     if (!inputText.trim() || sending) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const text = inputText;
     setInputText('');
 
@@ -141,7 +139,8 @@ export default function ChatScreen() {
   }, [messages, sending]);
 
   return (
-    <View style={[styles.container, { paddingBottom: isKeyboardVisible ? 0 : 100, paddingTop: insets.top + 16 }]}>
+    <View style={[styles.container, { paddingBottom: isKeyboardVisible ? 0 : 100 }]}>
+      {!isKeyboardVisible && <ScreenHeader title="AI Chat" subtitle="Pami Assistant" />}
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}

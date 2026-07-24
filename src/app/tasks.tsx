@@ -5,14 +5,11 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   RefreshControl,
   useColorScheme,
   Linking,
   Modal,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-
 import { MotiView } from 'moti';
 import { apiRequest } from '@/api/client';
 import { Colors, StatusColors } from '@/constants/theme';
@@ -20,7 +17,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import GlassCard from '@/components/GlassCard';
 import GlowButton from '@/components/GlowButton';
+import ScreenHeader from '@/components/ScreenHeader';
+import { SkeletonRow } from '@/components/Skeleton';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 
 interface Task {
   id: string;
@@ -42,7 +42,6 @@ const PRIORITY_COLORS: Record<string, { text: string; bg: string }> = {
 };
 
 export default function TasksScreen() {
-  const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const isDark = true;
   const colors = Colors.dark;
@@ -73,6 +72,7 @@ export default function TasksScreen() {
   const handleUpdateStatus = async (taskId: string, newStatus: string) => {
     try {
       await apiRequest('updateTask', 'POST', { taskId, status: newStatus });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       fetchTasks(true);
       if (selectedTask?.id === taskId) setSelectedTask(prev => prev ? { ...prev, status: newStatus } : null);
     } catch (err: any) { alert(`Failed to update status: ${err.message}`); }
@@ -82,6 +82,7 @@ export default function TasksScreen() {
     setConfirmingTaskId(taskId);
     try {
       await apiRequest('confirmPost', 'POST', { taskId });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       alert('🚀 Published to Instagram!');
       fetchTasks(true);
       setSelectedTask(null);
@@ -92,7 +93,8 @@ export default function TasksScreen() {
   const filteredTasks = filter === 'All' ? tasks : tasks.filter(t => t.status === filter);
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
+    <View style={styles.container}>
+      <ScreenHeader title="Tasks" subtitle="Automation Queue" />
 
       {/* ── Filter Chips Row ── */}
       <ScrollView
@@ -107,7 +109,7 @@ export default function TasksScreen() {
           return (
             <TouchableOpacity
               key={tab}
-              onPress={() => setFilter(tab)}
+              onPress={() => { Haptics.selectionAsync(); setFilter(tab); }}
               activeOpacity={0.75}
             >
               <MotiView
@@ -146,7 +148,9 @@ export default function TasksScreen() {
         showsVerticalScrollIndicator={false}
       >
         {loading ? (
-          <ActivityIndicator style={{ marginTop: 60 }} size="large" color={colors.primary} />
+          <View style={{ gap: 10, marginTop: 4 }}>
+            {[1, 2, 3, 4].map((i) => <SkeletonRow key={i} />)}
+          </View>
         ) : filteredTasks.length === 0 ? (
           <MotiView from={{ opacity: 0 }} animate={{ opacity: 1 }} style={styles.emptyState}>
             <Ionicons name="documents-outline" size={52} color={colors.textSecondary} />
